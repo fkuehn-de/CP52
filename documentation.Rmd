@@ -14,7 +14,7 @@ library(patchwork)
 library(reshape2)
 ```
 
-**Synposis:** This project is based on the *U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database*, which tracks characteristics of major storms and weather events in the United States. We use the *Storms dataset* to study the impact of meteorological events on the population health and on the economy. Our analysis shows that storms and extreme heat are the most harmful event types with respect to population health. Fires as well as events related to extreme temperatures and precipitation are the most relevant event types with regard to the economic consequences; these are measured by the damage of property and the damage of crop, which the events caused.
+**Synposis:** This project is based on the *U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database*, which tracks characteristics of major storms and weather events in the United States. We use the *Storms dataset* to study the impact of meteorological events on the population health and on the economy. Our analysis shows that storms and extreme heat are the most harmful event types with respect to population health. Storms, floods as well as events related to extreme temperatures and precipitation are the most relevant event types with regard to the economic consequences; these are measured by the damage of property and the damage of crop, which the events caused.
 
 ## Data Processing
 
@@ -96,11 +96,12 @@ For record:
 ```{r}
 length(unique(data$evtype))
 ```
-As can be seen, the number of event types has already significantly reduced. The most common ones (used more than 100 times) are:
+As can be seen, the number of event types has already significantly reduced. The most common ones (used more than 1000 times) are:
 
 ```{r}
 tmp<- table(data$evtype)
-sort(tmp[which(tmp>100)],decreasing=TRUE)
+knitr::kable(sort(tmp[which(tmp>1000)],decreasing=TRUE),format="markdown",col.names=c("type of event","frequency"))
+
 ```
 
 We make the following replacements to take care of differences in spelling.
@@ -126,6 +127,7 @@ data$evtype <- gsub("unseasonal|unusual|unusally","unseasonably",data$evtype)
 data$evtype <- gsub("^(sml)","small",data$evtype)
 data$evtype <- gsub("(hvy)","heavy",data$evtype)
 data$evtype <- gsub("strm","stream",data$evtype)
+data$evtype <- gsub("hot","heat",data$evtype)
 data$evtype <- gsub("rain \\(heavy\\)","heavy rain",data$evtype)
 data$evtype <- gsub("seas$","sea",data$evtype)
 data$evtype <- gsub("temperatures","temperature",data$evtype)
@@ -150,7 +152,7 @@ We have focussed here on the most important changes since the analysis which we 
 We create a new column for the event class.
 
 ```{r}
-keywordsTemp <- c("cold","heat","hot","warm","freeze","frost")
+keywordsTemp <- c("cold","heat","warm","freeze","frost")
 keywordsWind <- c("wind","storm","typhoon","hurricane","funnel cloud","dust","tornado")
 keywordsPrec <- c("drought","dry","rain","hail","snow","fog","sleet","ice","lightning","waterspout")
 keywordsFire <- c("fire")
@@ -166,7 +168,7 @@ data<- mutate(data,eventclass=case_when(str_detect(data$evtype,paste(keywordsTem
 
 data$eventclass[is.na(data$eventclass)]<-"other"
 
-table(data$eventclass)
+knitr::kable(table(data$eventclass),format="markdown",col.names=c("class of event","frequency"))
 ```
 
 
@@ -175,7 +177,7 @@ table(data$eventclass)
 In this section, we study the data which we just prepared for analysis. The first question which we want to study is which types of events are the most harmful with respect to population health. We take a look at the total number of fatalities/injuries for each event class:
 
 ```{r}
-totalByClass <- aggregate(list(fatalities=data$fatalities,injuries=data$injuries),list(class=data$eventclass),sum)
+totalByClass <- aggregate(list(fatalities=data$fatalities,injuries=data$injuries),list(class=data$eventclass),sum,na.rm=TRUE)
 
 totalByClass$ID <- as.factor(1:nrow(totalByClass))
 ggplot(melt(totalByClass, id=c("ID","class"),value.name = "count"),aes(class,count, fill=variable, group=variable))+ 
@@ -187,7 +189,7 @@ ggplot(melt(totalByClass, id=c("ID","class"),value.name = "count"),aes(class,cou
 Each event class contains a much different number of events, and so we cannot compare directly the total number of fatalities. It is better to consider the mean fatalities for each event class:
 
 ```{r}
-meanByClass <- aggregate(list(fatalities=data$fatalities,injuries=data$injuries),list(class=data$eventclass),mean)
+meanByClass <- aggregate(list(fatalities=data$fatalities,injuries=data$injuries),list(class=data$eventclass),mean,na.rm=TRUE)
 
 meanByClass$ID <- as.factor(1:nrow(meanByClass))
 ggplot(melt(meanByClass, id=c("ID","class"),value.name = "mean"),aes(class,mean, fill=variable, group=variable))+ 
@@ -199,20 +201,26 @@ ggplot(melt(meanByClass, id=c("ID","class"),value.name = "mean"),aes(class,mean,
 There are two classes which are of particular interest: wind (because of the high total number of fatalities/injuries) and temperature (high mean number of fatalities/injuries). The following tables show for the classes "wind" and "temperature" the mean number of fatalities and injuries per event type:
 
 ```{r}
-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsWind)
-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsWind)
+t1<-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsWind)
+t2<-mapply(function(str){round(sum(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsWind)
+t3<-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsWind)
+t4<-mapply(function(str){round(sum(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsWind)
+knitr::kable(cbind(t1,t2,t3,t4), format="markdown",col.names=c("mean number fatalities","total number fatalities", "mean number injuries","total number injuries"),caption="impact of events related to wind on poplation health")
 ```
 ```{r}
-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsTemp)
-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsTemp)
+t1<-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsTemp)
+t2<-mapply(function(str){round(sum(filter(data,grepl(str,data$evtype))$fatalities,rm.na=TRUE),digits=2)},keywordsTemp)
+t3<-mapply(function(str){round(mean(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsTemp)
+t4<-mapply(function(str){round(sum(filter(data,grepl(str,data$evtype))$injuries,rm.na=TRUE),digits=2)},keywordsTemp)
+knitr::kable(cbind(t1,t2,t3,t4), format="markdown",col.names=c("mean number fatalities","total number fatalities", "mean number injuries","total number injuries"),caption="impact of events related to extreme temperatures on poplation health")
 ```
 To summarize: We have seen that events related to temperature and wind are very harmful with respect to population health. Particularly harmful are heat as well as heavy storms. The total number of injuries/fatalities caused by avalanches or fires are relatively small, but the mean number is relatively high, i.e. whenever the a fire or avalanche occurs the number of victims is quite large.
 
 Next we address the greatest economic consequences. We use the same event classes as before and calculate for each event class the property damage and the crop damage.
 
 ```{r,warning=FALSE,fig.height=5,fig.width=15}
-damageByClass <- aggregate(list(property=data$property_damage,crop=data$crop_damage),list(class=data$eventclass),sum)
-MeanDamageByClass <- aggregate(list(property=data$property_damage,crop=data$crop_damage),list(class=data$eventclass),mean)
+damageByClass <- aggregate(list(property=data$property_damage,crop=data$crop_damage),list(class=data$eventclass),sum,na.rm=TRUE)
+MeanDamageByClass <- aggregate(list(property=data$property_damage,crop=data$crop_damage),list(class=data$eventclass),mean,na.rm=TRUE)
 
 damageByClass$ID <- as.factor(1:nrow(damageByClass))
 MeanDamageByClass$ID <- as.factor(1:nrow(MeanDamageByClass))
@@ -227,17 +235,17 @@ p2 <- ggplot(melt(MeanDamageByClass, id=c("ID","class"),value.name = "damage"),a
      labs(title="Mean damage per event class")
 p1+p2
 ```
-We see that fires cause the highest property damage (both in total and mean). For the crop damage, there are two important classes of events: those related to precipitation (e.g. droughts) and related to temperature (e.g. heat waves) have a big impact.
+We see that floods and storms cause a high property damage (both in total and mean). We also note that the mean property damage caused by fires is very high. For the crop damage, there are two important classes of events: those related to precipitation (e.g. droughts) and related to temperature (e.g. heat waves) have a big impact.
 
 ## Results 
 
 The largest number of events in the *Storms dataset* is related to precipitation and winds.
 
 ```{r}
-table(data$eventclass)
+knitr::kable(table(data$eventclass),col.names = c("class of event","frequency"),format="markdown")
 ```
 
-Our data analysis shows that the event types "storms" (including typhoons, hurricanes,...) and "heat" are the most harmful ones with respect to population health. Avalanches and fires happen less frequently than, say, e.g. storms, and so their total impact on population health is not that big. However, the mean number of injuries is for both event classes relatively high. Regarding the economic impact, one has to distinguish between damage of property and damage of crops. Fires are the most harmful events with respect to damage of property, while events related to precipitation and temperature (e.g. droughts, heat waves) cause a large part of the crop damage.
+Our data analysis shows that the event types "storms" (including typhoons, hurricanes,...) and "heat" are the most harmful ones with respect to population health. Avalanches and fires happen less frequently than, say, e.g. storms, and so their total impact on population health is not that big. However, the mean number of injuries is for both event classes relatively high. Regarding the economic impact, one has to distinguish between damage of property and damage of crops. Storms and floods are the most harmful events with respect to damage of property, while events related to precipitation and temperature (e.g. droughts, heat waves) cause a large part of the crop damage.
 
 ## Discussion
 
